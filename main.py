@@ -25,19 +25,19 @@ class Reader:
             (
                 pd.read_csv(filename, dtype=data_types, parse_dates=parse_dates, date_parser=pd.to_datetime,
                             index_col=None,
-                            header=0) for filename in all_filenames[0:1]),
+                            header=0)[:240] for filename in all_filenames),
             axis=0, ignore_index=True)
         return frame
 
 class MyModel:
 
-    # TODO get DATA as parameter and index for "target" data
+
     # where target is the data you want to predict
     def __init__(self):
         self.DATA = ('avgCPUloadin15mwindow',
                      # 'avgheap-oldgen20mwindow',
-                     #'avgMemoryinGB',
-                     #'avgnumberofcores',
+                     'avgMemoryinGB',
+                     'avgnumberofcores',
                      'maxCPUloadin15mwindow',
                      # 'maxheap-oldgen20mwindow',
                       'Recommendationratein5minwindow',
@@ -49,9 +49,11 @@ class MyModel:
         reader = Reader(path=path + '//' + self.DATA[0])
         # self.target = np.array([reader.read().loc[:, 'y']])
         self.feature = []
+        self.xlx =[]
         for i in range(0, len(self.DATA)):
             reader.set_path(path=path + '//' + self.DATA[i])
-            self.feature.append(np.array([reader.read().loc[:, 'y']]))
+            self.feature.append(np.array([reader.read().loc[:,'y']]))
+
 
     # showing the raw data without interpretation
     # TODO find out how to make it in loop
@@ -62,15 +64,16 @@ class MyModel:
         F2, = plt.plot(self.X[:,1])
         F3, = plt.plot(self.X[:,2])
         F4, = plt.plot(self.X[:,3])
-        # F5, = plt.plot(self.X[:,4])
-        # F6, = plt.plot(self.X[:, 5])
-        plt.legend([F1, F2, F3, F4], (self.DATA))
+        F5, = plt.plot(self.X[:,4])
+        F6, = plt.plot(self.X[:, 5])
+        plt.legend([F1, F2, F3, F4, F5, F6], (self.DATA))
         plt.show()
 
     # preparing the data (Min max normalization and shape of the data)
     def concatenate_data(self):
         self.X = np.concatenate(self.feature)
         self.X = np.transpose(self.X)
+
 
         # self.Y = self.target
         # self.Y = np.transpose(self.Y)
@@ -99,7 +102,9 @@ class MyModel:
 # t='talavital'
 model = MyModel()
 model.fetch_data('Data/crossServer/US')
+
 model.concatenate_data()
 model.normalize()
 model.present_raw_data()
 name='talavital'
+

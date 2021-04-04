@@ -51,13 +51,13 @@ X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.3)
 
 model = Sequential()
 
-model.add(LSTM(20, activation='tanh', input_shape=(1, 2), recurrent_activation='hard_sigmoid'))
+model.add(LSTM(10, activation='tanh', input_shape=(1, 2), recurrent_activation='hard_sigmoid'))
 
 model.add(Dense(1))
 
 model.compile(loss='mean_squared_error', optimizer='rmsprop', metrics=[metrics.mae])
 
-model.fit(X_train, Y_train, epochs=50, verbose=2)
+model.fit(X_train, Y_train, epochs=20, verbose=2)
 
 predict = model.predict(X_test)
 
