@@ -7,6 +7,7 @@ from sklearn.preprocessing import MinMaxScaler
 from plotly.offline import download_plotlyjs, init_notebook_mode, plot, iplot
 import plotly
 import plotly.graph_objs as go
+from plotly.subplots import make_subplots
 
 class Reader:
     # path is the path to the Main dataset folder
@@ -37,14 +38,15 @@ class MyModel:
 
     # where target is the data you want to predict
     def __init__(self):
-        self.DATA = ('avgCPUloadin15mwindow',
-                     'avgheap-oldgen20mwindow',
-                     'avgMemoryinGB',
-                     'avgnumberofcores',
-                     'maxCPUloadin15mwindow',
-                     'maxheap-oldgen20mwindow',
-                      'Recommendationratein5minwindow',
-                      'The99thPercentileOfResponseTimeToArecommenationRequest')
+        self.DATA = ('max_cpu_load',
+                     'avg_cpu_load',
+                     'max_heap',
+                     'avg_heap',
+                     'avg_num_cores',
+                     'avg_memory',
+                      'reco_rate',
+                      'p99_response_time',
+                     'cpu_user_util')
 
     # fetching the data from path,
     # where path is the main folder containing the data.
@@ -65,10 +67,13 @@ class MyModel:
         trace5 = go.Scatter(x=self.newfeature[5]['ds'], y=self.newfeature[5][0], name=self.DATA[5])
         trace6 = go.Scatter(x=self.newfeature[6]['ds'], y=self.newfeature[6][0], name=self.DATA[6])
         trace7 = go.Scatter(x=self.newfeature[7]['ds'], y=self.newfeature[7][0], name=self.DATA[7])
-        data_tr = [trace0, trace1, trace2 ,trace3, trace4, trace5, trace6, trace7]
+        trace8 = go.Scatter(x=self.newfeature[8]['ds'], y=self.newfeature[8][0], name=self.DATA[8])
+        data_tr = [trace0, trace1, trace2 ,trace3, trace4, trace5, trace6, trace7, trace8]
 
-        fig=go.Figure(data_tr,layout={'title': 'matrics to Evaluate'})
-        iplot(fig,show_link=False)
+        fig=go.Figure(data=data_tr,layout={'title': 'matrics to Evaluate'})
+        fig.update_xaxes(title_text="date-time-per-5-min")
+        fig.update_yaxes(title_text="values")
+        iplot(fig, show_link=False)
 
 
 
@@ -129,8 +134,8 @@ class MyModel:
 
 
 model = MyModel()
-model.fetch_data('Data/crossServer/US')
-# model.fetch_data('Data/singleServer/US/32 cores 125.64 GB')
+# model.fetch_data('Data/crossServer/US')
+model.fetch_data('Data/singleServer/US/32 cores 125.64 GB')
 
 # model.concatenate_data()
 model.normalize()
