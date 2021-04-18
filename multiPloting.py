@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import glob
 import seaborn as sns
+
 from sklearn.preprocessing import MinMaxScaler
 from plotly.offline import download_plotlyjs, init_notebook_mode, plot, iplot
 import plotly
@@ -50,6 +51,7 @@ class MyModel:
                      'avg_memory',
                       'reco_rate',
                       'p99_response_time',
+                     'load_score_meter',
                      'cpu_user_util')
 
     # fetching the data from path,
@@ -63,15 +65,17 @@ class MyModel:
             reader.set_path(path=path + '//' + self.DATA[i])
             self.feature.append(reader.read())
     def present_raw_data_plotly(self,i):
-        self.Fig.add_trace(go.Scatter(x=self.newfeature[0]['ds'],y=self.newfeature[0][0],name=self.DATA[0]),row=i,col=1)
-        self.Fig.add_trace(go.Scatter(x=self.newfeature[1]['ds'], y=self.newfeature[1][0], name=self.DATA[1]),row=i,col=1)
-        self.Fig.add_trace(go.Scatter(x=self.newfeature[2]['ds'], y=self.newfeature[2][0], name=self.DATA[2]),row=i,col=1)
-        self.Fig.add_trace(go.Scatter(x=self.newfeature[3]['ds'], y=self.newfeature[3][0], name=self.DATA[3]),row=i,col=1)
-        self.Fig.add_trace(go.Scatter(x=self.newfeature[4]['ds'], y=self.newfeature[4][0], name=self.DATA[4]),row=i,col=1)
-        self.Fig.add_trace(go.Scatter(x=self.newfeature[5]['ds'], y=self.newfeature[5][0], name=self.DATA[5]),row=i,col=1)
-        self.Fig.add_trace(go.Scatter(x=self.newfeature[6]['ds'], y=self.newfeature[6][0], name=self.DATA[6]),row=i,col=1)
-        self.Fig.add_trace(go.Scatter(x=self.newfeature[7]['ds'], y=self.newfeature[7][0], name=self.DATA[7]),row=i,col=1)
-        self.Fig.add_trace(go.Scatter(x=self.newfeature[8]['ds'], y=self.newfeature[8][0], name=self.DATA[8]),row=i,col=1)
+        self.Fig.add_trace(go.Scatter(x=self.newfeature[0]['ds'],y=self.newfeature[0]['value'],name=self.DATA[0]),row=i,col=1)
+        self.Fig.add_trace(go.Scatter(x=self.newfeature[1]['ds'], y=self.newfeature[1]['value'], name=self.DATA[1]),row=i,col=1)
+        self.Fig.add_trace(go.Scatter(x=self.newfeature[2]['ds'], y=self.newfeature[2]['value'], name=self.DATA[2]),row=i,col=1)
+        self.Fig.add_trace(go.Scatter(x=self.newfeature[3]['ds'], y=self.newfeature[3]['value'], name=self.DATA[3]),row=i,col=1)
+        self.Fig.add_trace(go.Scatter(x=self.newfeature[4]['ds'], y=self.newfeature[4]['value'], name=self.DATA[4]),row=i,col=1)
+        self.Fig.add_trace(go.Scatter(x=self.newfeature[5]['ds'], y=self.newfeature[5]['value'], name=self.DATA[5]),row=i,col=1)
+        self.Fig.add_trace(go.Scatter(x=self.newfeature[6]['ds'], y=self.newfeature[6]['value'], name=self.DATA[6]),row=i,col=1)
+        self.Fig.add_trace(go.Scatter(x=self.newfeature[7]['ds'], y=self.newfeature[7]['value'], name=self.DATA[7]),row=i,col=1)
+        self.Fig.add_trace(go.Scatter(x=self.newfeature[8]['ds'], y=self.newfeature[8]['value'], name=self.DATA[8]),row=i,col=1)
+        self.Fig.add_trace(go.Scatter(x=self.newfeature[9]['ds'], y=self.newfeature[9]['value'], name=self.DATA[9]),row=i,col=1)
+
         # data_tr = [trace0, trace1, trace2 ,trace3, trace4, trace5, trace6, trace7, trace8]
 
         # fig=go.Figure(data=data_tr,layout={'title': 'matrics to Evaluate'})
@@ -137,6 +141,7 @@ class MyModel:
             y = scaler.transform(y)
             data=pd.DataFrame(y)
             data['ds']=f['ds']
+            data.columns=['value','ds']
             self.newfeature.append(data)
 
 
