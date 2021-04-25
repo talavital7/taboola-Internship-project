@@ -1,6 +1,8 @@
 import os, glob
 import pandas as pd
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+mpl.use('tkagg') #this is for running matplotlib on mac
 import plotly.graph_objects as go
 import seaborn as sns
 from functools import reduce
@@ -86,27 +88,6 @@ def split_train_test(n_time_steps, values, train_size):
 
 	return train_X, train_y, test_X, test_y
 
-def plot_loss_and_accuracy(history):
-	# summarize history for accuracy
-	print(history.history.keys())
-	plt.figure(1)
-	plt.plot(history.history['accuracy'])
-	plt.plot(history.history['val_accuracy'])
-	plt.title('model accuracy')
-	plt.ylabel('accuracy')
-	plt.xlabel('epoch')
-	plt.legend(['train', 'test'], loc='upper left')
-	plt.show(block=False)
-	# summarize history for loss
-	plt.figure(2)
-	plt.plot(history.history['loss'])
-	plt.plot(history.history['val_loss'])
-	plt.title('model loss')
-	plt.ylabel('loss')
-	plt.xlabel('epoch')
-	plt.legend(['train', 'test'], loc='upper left')
-	plt.show()
-
 class MyModel:
 	def __init__(self, timesteps_to_the_future):
 		self.DATA = ['avg_cpu_load',
@@ -164,8 +145,7 @@ class MyModel:
 		model.add(LSTM(20, activation='relu', input_shape=(self.X_train.shape[1], num_of_features), recurrent_activation='hard_sigmoid'))
 		model.add(Dense(1))
 		model.compile(loss='mean_squared_error', optimizer='adam', metrics=[metrics.mae, 'accuracy'])
-		history = model.fit(self.X_train, self.Y_train, epochs=20, batch_size=32, verbose=2)
-		plot_loss_and_accuracy(history)
+		model.fit(self.X_train, self.Y_train, epochs=20, batch_size=32, verbose=2)
 		self.predict = model.predict(self.X_test)
 		self.model = model
 
@@ -184,7 +164,7 @@ class MyModel:
 		sc.fit(data_without_dates)
 		dataToCheck = sc.fit_transform(data_without_dates)
 		dataToCheckDf= pd.DataFrame(dataToCheck)
-		dataToCheckDf.columns = self.DATA+['is_weekend']
+		dataToCheckDf.columns = self.DATA + ['is_weekend']
 		dataToHeatMap= add_multiply(dataToCheckDf)
 		dataToHeatMap = drop_low_corr_feature(dataToHeatMap)
 		# dataToHeatMap = self.add_trend(dataToCheckDf)
@@ -218,20 +198,39 @@ class MyModel:
 								 connectgaps=False
 								 ))
 
-		#Cross validation plot
+		# Cross validation plot
 		Fig.show()
-		plt.figure(3)
+		plt.figure(1)
 		plt.scatter(self.Y_test, self.predict)
 		plt.title(' Cross validation on CPU utilization for ' + title)
 		plt.show(block=False)
-		#predict VS real plot
-		plt.figure(4)
+		# predict VS real plot
+		plt.figure(2)
 		Real, = plt.plot(self.Y_test)
 		Predict, = plt.plot(self.predict)
 		plt.title('CPU utilization for ' + title)
 		plt.legend([Predict, Real], ["Predicted", "Real"])
 		plt.show(block=False)
 
+		#TODO: Fix the dimensions in the reshape
+		# # accuracy and loss
+		# self.model.compile(loss='mean_squared_error', optimizer='adam', metrics=['accuracy', metrics.mae])
+		# # Fit the model
+		# X = self.second_normalized_data_to_input.reshape((self.second_normalized_data_to_input.shape[0], 1, self.second_normalized_data_to_input.shape[1]))
+		# history = self.model.fit(X, self.cpu_user_util_to_input, validation_split=0.25, epochs=20, batch_size=128, verbose=0)
+		# # list all data in history
+		# print(history.history.keys())
+		# # summarize history for accuracy
+		# plt.plot(history.history['accuracy'])
+		# plt.plot(history.history['val_accuracy'])
+		# # summarize history for loss
+		# plt.plot(history.history['loss'])
+		# plt.plot(history.history['val_loss'])
+		# plt.title('model accuracy and loss')
+		# plt.ylabel('accuracy')
+		# plt.xlabel('epoch')
+		# plt.legend(['train', 'test'], loc='upper left')
+		# plt.show()
 
 
 
