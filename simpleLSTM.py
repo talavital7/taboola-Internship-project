@@ -1,8 +1,9 @@
 import os, glob
 import pandas as pd
+import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-mpl.use('tkagg') #this is for running matplotlib on mac
+# mpl.use('tkagg') #this is for running matplotlib on mac
 import plotly.graph_objects as go
 import seaborn as sns
 from functools import reduce
@@ -15,6 +16,7 @@ import argparse
 
 
 def read_csv_to_df(data_path, core_path, matric):
+	# sub_folders = [name for name in os.listdir(os.path.join(data_path + core_path))]
 	all_files = glob.glob(os.path.join(data_path + core_path +'/'+ matric, "*.csv"))
 	all_csv = (pd.read_csv(f, sep=',') for f in all_files)
 	data = pd.concat(all_csv, ignore_index=True)
@@ -38,7 +40,7 @@ def drop_low_corr_feature(dataset):
 	corr = corr.abs()
 	print(corr)
 	for name in dataset.columns:
-		if (name != "dates" and corr[name] < 0.8):
+		if (name != "dates" and (corr[name] < 0.8 or np.isnan(corr[name]) )):
 			dataset.drop(columns=[name], inplace=True)
 	return dataset
 
@@ -58,8 +60,8 @@ def add_multiply(dataset):
 	feature_names2 = dataset.columns[1:]
 	for feature1 in feature_names1:
 		for feature2 in feature_names2:
-			if (
-								feature1 != feature2 and feature1 != "dates" and feature2 != "dates" and feature1 != "cpu_user_util" and feature2 != "cpu_user_util"):
+			if (feature1 != feature2 and feature1 != "dates" and feature2 != "dates"
+					and feature1 != "cpu_user_util" and feature2 != "cpu_user_util"):
 				to_add = dataset[feature1] * dataset[feature2]
 				dataset[feature1 + " * " + feature2] = to_add
 	return dataset
@@ -90,20 +92,21 @@ def split_train_test(n_time_steps, values, train_size):
 
 class MyModel:
 	def __init__(self, timesteps_to_the_future):
-		self.DATA = ['avg_cpu_load',
-				'max_cpu_load',
-				'p99_response_time',
-				'reco_rate',
-				'load_score_meter',
-				'cpu_user_util',
-				# 'avg_memory',
-				# 'avg_num_cores',
-				# 'max_heap',
-				# 'avg_heap',
-				]
+		# self.DATA = ['avg_cpu_load',
+		# 		'max_cpu_load',
+		# 		'p99_response_time',
+		# 		'reco_rate',
+		# 		'load_score_meter',
+		# 		'cpu_user_util',
+		# 		# 'avg_memory',
+		# 		# 'avg_num_cores',
+		# 		# 'max_heap',
+		# 		# 'avg_heap',
+		# 		]
 		self.timesteps_to_the_future = timesteps_to_the_future
 
 	def data_prep(self, data_path, cores):
+		self.DATA = [name for name in os.listdir(os.path.join(data_path + cores))]
 		csv_data_cores = [read_csv_to_df(data_path, cores, metric) for metric in self.DATA]
 		data_per_cores = reduce(lambda left, right: merge_and_drop_dups(left, right), csv_data_cores)
 		data_per_cores.dropna(inplace=True)
@@ -116,10 +119,14 @@ class MyModel:
 		self.dates_to_test = self.data_per_cores['dates']
 		# adding new features and pick the best for the model
 		data_without_dates = self.add_features(self.data_per_cores)
+		corr = data_without_dates.corr()["cpu_user_util"]
 		# dropping dates
 		data_without_dates = data_without_dates.drop('dates', 1)
+		c_u_u=data_without_dates['cpu_user_util']
+		data_without_dates.drop('cpu_user_util', 1,inplace=True)
+		data_without_dates.insert(data_without_dates.shape[1],'cpu_user_util',c_u_u)
 		# dropping cpu util
-		self.data_without_dates = data_without_dates.drop('cpu_user_util', 1)
+		self.data_without_dates = data_without_dates    #.drop('cpu_user_util', 1)
 
 	def normalize(self):
 		# global second_normalized_data_to_input, cpu_user_util_to_input
@@ -145,7 +152,7 @@ class MyModel:
 		model.add(LSTM(20, activation='relu', input_shape=(self.X_train.shape[1], num_of_features), recurrent_activation='hard_sigmoid'))
 		model.add(Dense(1))
 		model.compile(loss='mean_squared_error', optimizer='adam', metrics=[metrics.mae, 'accuracy'])
-		model.fit(self.X_train, self.Y_train, epochs=20, batch_size=32, verbose=2)
+		model.fit(self.X_train, self.Y_train, epochs=30, batch_size=32, verbose=2)
 		self.predict = model.predict(self.X_test)
 		self.model = model
 
@@ -197,7 +204,7 @@ class MyModel:
 								 line=dict(shape='linear'),
 								 connectgaps=False
 								 ))
-
+		#Fig.show()
 		# Cross validation plot
 		Fig.show()
 		plt.figure(1)
@@ -213,11 +220,11 @@ class MyModel:
 		plt.show(block=False)
 
 		#TODO: Fix the dimensions in the reshape
-		# # accuracy and loss
+		# accuracy and loss
 		# self.model.compile(loss='mean_squared_error', optimizer='adam', metrics=['accuracy', metrics.mae])
 		# # Fit the model
 		# X = self.second_normalized_data_to_input.reshape((self.second_normalized_data_to_input.shape[0], 1, self.second_normalized_data_to_input.shape[1]))
-		# history = self.model.fit(X, self.cpu_user_util_to_input, validation_split=0.25, epochs=20, batch_size=128, verbose=0)
+		# history = self.model.fit(self.X_train, self.cpu_user_util_to_input, validation_split=0.25, epochs=20, batch_size=128, verbose=0)
 		# # list all data in history
 		# print(history.history.keys())
 		# # summarize history for accuracy
