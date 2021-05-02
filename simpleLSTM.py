@@ -1,4 +1,6 @@
 import os, glob
+from datetime import time
+
 import pandas as pd
 import numpy as np
 import matplotlib as mpl
@@ -7,12 +9,17 @@ import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import seaborn as sns
 from functools import reduce
+
+from sklearn.metrics import make_scorer, accuracy_score
 from sklearn.preprocessing import MinMaxScaler
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import LSTM
 from keras import metrics
 import argparse
+from sklearn.model_selection import GridSearchCV
+from tensorflow import estimator
+from tensorflow.python.keras.wrappers.scikit_learn import KerasRegressor
 
 
 def read_csv_to_df(data_path, core_path, matric):
@@ -85,6 +92,7 @@ def split_train_test(n_time_steps, values, train_size):
 	test_y = values_y[n_train_hours:]
 
 	# reshape input to be 3D [samples, timesteps, features]
+
 	train_X = train_X.reshape((train_X.shape[0], 1, train_X.shape[1]))
 	test_X = test_X.reshape((test_X.shape[0], 1, test_X.shape[1]))
 
@@ -130,12 +138,12 @@ class MyModel:
 
 	def normalize(self):
 		# global second_normalized_data_to_input, cpu_user_util_to_input
-		sc = MinMaxScaler()
-		sc.fit(self.data_without_dates)
-		self.second_normalized_data_to_input = sc.fit_transform(self.data_without_dates)
+		self.sc = MinMaxScaler()
+		self.sc.fit(self.data_without_dates)
+		self.second_normalized_data_to_input = self.sc.fit_transform(self.data_without_dates)
 		data_to_predict_cpu_user_util = self.data_per_cores['cpu_user_util']
 		data_to_predict_cpu_user_util_reshape = data_to_predict_cpu_user_util.values.reshape(-1, 1)
-		self.cpu_user_util_to_input = sc.fit_transform(data_to_predict_cpu_user_util_reshape)
+		self.cpu_user_util_to_input = self.sc.fit_transform(data_to_predict_cpu_user_util_reshape)
 
 
 	#TODO:put in function
@@ -143,18 +151,71 @@ class MyModel:
 
 	def build_model(self):
 		self.X_train, self.Y_train, self.X_test, self.Y_test = split_train_test(self.timesteps_to_the_future, self.second_normalized_data_to_input,	0.75)
-		dates_of_predict = self.dates_to_test[self.X_train.shape[0]:]
-		dates_of_predict = dates_of_predict.values
-		self.dates_of_predict = dates_of_predict.reshape((dates_of_predict.shape[0], 1))
+		# dates_of_predict = self.dates_to_test[self.X_train.shape[0]:]
+		# dates_of_predict = dates_of_predict.values
+		# self.dates_of_predict = dates_of_predict.reshape((dates_of_predict.shape[0], 1))
+		#
+		# model = Sequential()
+		# num_of_features = self.X_train.shape[2]
+		# model.add(LSTM(20, activation='relu', input_shape=(self.X_train.shape[1], num_of_features), recurrent_activation='hard_sigmoid'))
+		# model.add(Dense(1))
+		# model.compile(loss='mean_squared_error', optimizer='adam', metrics=[metrics.mae, 'accuracy'])
+		#TODO: consider adding early stopping.
+		# model.fit(self.X_train, self.Y_train, epochs=30, batch_size=64, verbose=2)
+		# self.predict = model.predict(self.X_test)
+		# self.model = model
 
-		model = Sequential()
-		num_of_features = self.X_train.shape[2]
-		model.add(LSTM(20, activation='relu', input_shape=(self.X_train.shape[1], num_of_features), recurrent_activation='hard_sigmoid'))
-		model.add(Dense(1))
-		model.compile(loss='mean_squared_error', optimizer='adam', metrics=[metrics.mae, 'accuracy'])
-		model.fit(self.X_train, self.Y_train, epochs=30, batch_size=32, verbose=2)
-		self.predict = model.predict(self.X_test)
-		self.model = model
+	def show_future_train_test(self):
+		# make predictions
+		trainPredict = self.model.predict(self.X_train)
+		testPredict = self.model.predict(self.X_test)
+		# invert predictions
+		trainPredict = self.sc.inverse_transform(trainPredict)
+		trainY = self.sc.inverse_transform([self.Y_train])
+		testPredict = self.sc.inverse_transform(testPredict)
+		testY = self.sc.inverse_transform([self.Y_test])
+		# calculate root mean squared error
+		# trainScore = math.sqrt(mean_squared_error(trainY[0], trainPredict[:, 0]))
+		# print('Train Score: %.2f RMSE' % (trainScore))
+		# testScore = math.sqrt(mean_squared_error(testY[0], testPredict[:, 0]))
+		# print('Test Score: %.2f RMSE' % (testScore))
+		# shift train predictions for plotting
+		trainPredictPlot = np.empty_like(self.cpu_user_util_to_input)
+		trainPredictPlot[:, :] = np.nan
+		trainPredictPlot[self.timesteps_to_the_future:len(trainPredict) + self.timesteps_to_the_future, :] = trainPredict
+		# shift test predictions for plotting
+		testPredictPlot = np.empty_like(self.cpu_user_util_to_input)
+		testPredictPlot[:, :] = np.nan
+		testPredictPlot[len(trainPredict) + (self.timesteps_to_the_future) :, :] = testPredict
+		# plot baseline and predictions
+		raw_cpu_util = self.sc.inverse_transform(self.cpu_user_util_to_input)
+		plt.plot(raw_cpu_util)
+		plt.plot(trainPredictPlot)
+		plt.plot(testPredictPlot)
+		plt.show()
+		Fig = go.Figure()
+
+		dates_of_predict = pd.DataFrame({'vals': self.dates_to_test})
+		Fig.add_trace(go.Scatter(x=dates_of_predict['vals'], y=trainPredictPlot.reshape(-1),
+								 name='train predict',
+								 mode='markers+lines',
+								 line=dict(shape='linear'),
+								 connectgaps=False
+								 ))
+		Fig.add_trace(go.Scatter(x=dates_of_predict['vals'], y=testPredictPlot.reshape(-1),
+								 name='test preditct',
+								 mode='markers+lines',
+								 line=dict(shape='linear'),
+								 connectgaps=False
+								 ))
+		Fig.add_trace(go.Scatter(x=dates_of_predict['vals'], y=raw_cpu_util.reshape(-1),
+								 name='real data',
+								 mode='markers+lines',
+								 line=dict(shape='linear'),
+								 connectgaps=False
+								 ))
+
+		Fig.show()
 
 	def add_features(self, dataset):
 		dataset = add_isWeekend_feature(dataset)
@@ -239,7 +300,44 @@ class MyModel:
 		# plt.legend(['train', 'test'], loc='upper left')
 		# plt.show()
 
+	def grids(self,time_steps):
+		# LSTM  Input Shape
+		time_steps = 1  # number of time-steps you are feeding a sequence (?)
+		inputs_numb = self.X_train.shape[1]  # number of inputs
+		input_shape = [time_steps, inputs_numb]
+		#,input_shape=input_shape
+		model = KerasRegressor(build_fn=create_model, verbose=1)
 
+		# GridSearch code
+		start = time()
+		optimizers = ['adam', 'Adamax', 'Nadam']
+		epochs = [30,50, 100]
+		hl1_nodes = [10, 20, 50]
+		btcsz = [32, 64, 128]
+		#learning_rate= [0.001, 0.01, 0.0001]
+
+		param_grid = dict(optimizer=optimizers, hl1_nodes=hl1_nodes, nb_epoch=epochs, batch_size=btcsz)
+		scoring = make_scorer(accuracy_score)  # in order to use a metric as a scorer
+		#scoring = estimator.score(self.X_test,self.Y_test)
+		grid = GridSearchCV(estimator=model, param_grid=param_grid, scoring='neg_mean_absolute_error', n_jobs=-1, verbose=3)
+		grid_result = grid.fit(self.X_train, self.Y_train)
+
+		print("Best: %f using %s" % (grid_result.best_score_, grid_result.best_params_))
+		# for params, mean_score, scores in grid_result.cv_results_:
+		# 	print("%f (%f) with: %r" % (scores.mean(), scores.std(), params))
+		for x in grid_result.cv_results_:
+			print(x)
+		print("total time:", time() - start)
+
+def create_model(optimizer, hl1_nodes):
+    # creation of the NN - Electric Load
+    # LSTM layers followed by other LSTM layer must have the parameter "return_sequences" set at True
+    model = Sequential()
+    model.add(LSTM(units = hl1_nodes , input_shape=(1,43), return_sequences=False))
+    model.add(Dense(1))  # output layer
+    model.compile(optimizer=optimizer, loss='mean_squared_error', metrics=['accuracy'])
+    model.summary()
+    return model
 
 def main(arguments):
 	#cores_32 = '32 cores 125.6 GB'
@@ -251,7 +349,9 @@ def main(arguments):
 	# model.heat_map_correlation()
 	model.normalize()
 	model.build_model()
-	model.plot(cores_40)
+	model.grids(arguments.timesteps_to_the_future)
+	# model.show_future_train_test()
+	# model.plot(cores_40)
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='LSTM supervised')
