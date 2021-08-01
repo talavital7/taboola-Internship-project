@@ -12,7 +12,7 @@ from sklearn.metrics import make_scorer, accuracy_score
 from sklearn.preprocessing import MinMaxScaler
 from keras.models import Sequential
 from keras.layers import Dense
-from keras.layers import LSTM
+from keras.layers import LSTM, Dropout, RepeatVector, TimeDistributed, Activation
 from keras import metrics
 import argparse
 from sklearn.model_selection import GridSearchCV
@@ -158,16 +158,27 @@ class MyModel:
         self.X_train, self.Y_train, self.X_test, self.Y_test = split_train_test(self.timesteps_to_the_future,
                                                                                 self.second_normalized_data_to_input,
                                                                                 0.75)
+
+        # self.Y_train.tofile('Y_train.csv',sep=',')
+        # self.X_train.tofile('X_train.csv',sep=',')
+        # self.X_test.tofile('X_test.csv',sep=',')
+        # self.Y_test.tofile('Y_test.csv',sep=',')
         dates_of_predict = self.dates_to_test[self.X_train.shape[0]:]
         dates_of_predict = dates_of_predict.values
         self.dates_of_predict = dates_of_predict.reshape((dates_of_predict.shape[0], 1))
         model = Sequential()
         # newdf = self.X_train
         # newdf['Pred'] = self.Y_train
-        num_of_features = self.X_train.shape[2]
-        model.add(LSTM(20, activation='relu', input_shape=(self.X_train.shape[1], num_of_features),
-                       recurrent_activation='hard_sigmoid'))
-        model.add(Dense(1))
+        #num_of_features = self.X_train.shape[2]
+        #model.add(LSTM(20, activation='relu', input_shape=(self.X_train.shape[1], num_of_features),
+        #               recurrent_activation='hard_sigmoid'))
+        #model.add(Dense(1))
+        model.add(LSTM(units=128, input_shape=(self.X_train.shape[1], self.X_train.shape[2])))
+        model.add(Dropout(rate=0.2))
+        model.add(RepeatVector(n=self.X_train.shape[1]))
+        model.add(LSTM(units=128, return_sequences=True))
+        model.add(Dropout(rate=0.2))
+        model.add(TimeDistributed(Dense(self.X_train.shape[2])))
         model.compile(loss='mean_squared_error', optimizer='adam', metrics=[metrics.mae, 'accuracy'])
         # TODO: consider adding early stopping.
         model.fit(self.X_train, self.Y_train, epochs=30, batch_size=64, verbose=2)
